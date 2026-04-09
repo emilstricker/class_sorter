@@ -5,7 +5,7 @@ import { ClassBoard } from './components/ClassBoard';
 import { EditModal } from './components/EditModal';
 import { StatsModal } from './components/StatsModal';
 import { StudentTableView } from './components/StudentTableView';
-import { Upload, Users, AlertCircle, Trash2, Loader2, List, Wand2, RotateCcw, Eye, EyeOff, Download, UploadCloud, ShieldCheck, Settings, X, ArrowUpDown, Search, BarChart3, Printer } from 'lucide-react';
+import { Upload, Users, AlertCircle, Trash2, Loader2, List, Wand2, RotateCcw, Eye, EyeOff, Download, UploadCloud, ShieldCheck, Settings, X, ArrowUpDown, Search, BarChart3, Printer, Layout } from 'lucide-react';
 
 type SortField = 'name' | 'abilityLevel' | 'socialSkill' | 'behavioralIntensity' | 'supportLevel';
 
@@ -94,6 +94,7 @@ export default function App() {
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
+  const [hideCardDetails, setHideCardDetails] = useState(false);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [globalSearch, setGlobalSearch] = useState('');
@@ -626,7 +627,7 @@ export default function App() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative group">
+          <div className={`relative group ${hideCardDetails ? 'hidden' : ''}`}>
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" size={16} />
             <input 
               type="text"
@@ -645,7 +646,7 @@ export default function App() {
             )}
           </div>
 
-          <div className="h-8 w-px bg-gray-200 mx-1 hidden sm:block" />
+          <div className={`h-8 w-px bg-gray-200 mx-1 hidden sm:block ${hideCardDetails ? 'hidden' : ''}`} />
 
           <input 
             type="file" 
@@ -658,7 +659,7 @@ export default function App() {
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-indigo-100 active:scale-95"
+            className={`flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-indigo-100 active:scale-95 ${hideCardDetails ? 'hidden' : ''}`}
           >
             {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
             <span className="hidden sm:inline">{isUploading ? 'Behandler...' : 'Upload fotos'}</span>
@@ -667,7 +668,7 @@ export default function App() {
           <button 
             onClick={handleAutoSort}
             disabled={unassignedStudents.length === 0}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-emerald-100 active:scale-95"
+            className={`flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-emerald-100 active:scale-95 ${hideCardDetails ? 'hidden' : ''}`}
           >
             <Wand2 size={18} />
             <span className="hidden sm:inline">Auto-fordeling</span>
@@ -675,13 +676,13 @@ export default function App() {
 
           <button 
             onClick={() => setShowStatsModal(true)}
-            className="flex items-center justify-center bg-white border border-gray-200 hover:border-indigo-200 hover:bg-indigo-50 text-gray-700 w-11 h-11 rounded-xl transition-all shadow-sm active:scale-95 group"
+            className={`flex items-center justify-center bg-white border border-gray-200 hover:border-indigo-200 hover:bg-indigo-50 text-gray-700 w-11 h-11 rounded-xl transition-all shadow-sm active:scale-95 group ${hideCardDetails ? 'hidden' : ''}`}
             title="Statistik"
           >
             <BarChart3 size={20} className="text-gray-400 group-hover:text-indigo-600 transition-colors" />
           </button>
 
-          <div className="relative">
+          <div className={`relative ${hideCardDetails ? 'hidden' : ''}`}>
             <button 
               onClick={handlePrint}
               className="flex items-center justify-center bg-white border border-gray-200 hover:border-indigo-200 hover:bg-indigo-50 text-gray-700 w-11 h-11 rounded-xl transition-all shadow-sm active:scale-95 group no-print"
@@ -737,12 +738,12 @@ export default function App() {
             <div className="flex items-center gap-3">
               <h2 className="font-semibold text-gray-700 flex items-center gap-2">
                 Ikke-tildelte elever
-                <span className="bg-gray-200 text-gray-700 text-xs py-0.5 px-2 rounded-full font-bold">
+                <span className={`bg-gray-200 text-gray-700 text-xs py-0.5 px-2 rounded-full font-bold ${hideCardDetails ? 'hidden' : ''}`}>
                   {unassignedStudents.length}
                 </span>
               </h2>
             </div>
-            <span className="text-xs text-gray-500">Træk elever herfra til klasserne nedenfor</span>
+            <span className={`text-xs text-gray-500 ${hideCardDetails ? 'hidden' : ''}`}>Træk elever herfra til klasserne nedenfor</span>
           </div>
           <div className="p-4 overflow-x-auto min-h-[152px]">
             <div className="flex gap-3 pb-2 w-max">
@@ -754,6 +755,7 @@ export default function App() {
                   onDragStart={handleDragStart}
                   isBulkMode={isBulkMode}
                   isPrivacyMode={isPrivacyMode}
+                  hideDetails={hideCardDetails}
                   onToggleLock={handleToggleLock}
                 />
               ))}
@@ -790,6 +792,7 @@ export default function App() {
               onDragStart={handleDragStart}
               isBulkMode={isBulkMode}
               isPrivacyMode={isPrivacyMode}
+              hideDetails={hideCardDetails}
               onToggleLock={handleToggleLock}
             />
           ))}
@@ -894,6 +897,22 @@ export default function App() {
                     </div>
                     <div className={`w-10 h-6 rounded-full p-1 transition-colors ${isPrivacyMode ? 'bg-indigo-600' : 'bg-gray-300'}`}>
                       <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${isPrivacyMode ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => setHideCardDetails(!hideCardDetails)}
+                    className="w-full flex items-center justify-between bg-gray-50 hover:bg-gray-100 p-3 rounded-lg border border-gray-100 transition-colors text-left"
+                  >
+                    <div>
+                      <span className="text-sm font-medium text-gray-800 flex items-center gap-2">
+                        <Layout size={16} className="text-slate-600"/>
+                        Skjul detaljer på kort
+                      </span>
+                      <span className="text-xs text-gray-500 block mt-0.5">Skjuler navne og statistikker (godt til screenshots)</span>
+                    </div>
+                    <div className={`w-10 h-6 rounded-full p-1 transition-colors ${hideCardDetails ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                      <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${hideCardDetails ? 'translate-x-4' : 'translate-x-0'}`} />
                     </div>
                   </button>
                 </div>

@@ -12,6 +12,7 @@ interface ClassBoardProps {
   onDragStart: (e: React.DragEvent, studentId: string) => void;
   isBulkMode: boolean;
   isPrivacyMode?: boolean;
+  hideDetails?: boolean;
   onToggleLock: (studentId: string) => void;
 }
 
@@ -24,6 +25,7 @@ export function ClassBoard({
   onDragStart,
   isBulkMode,
   isPrivacyMode,
+  hideDetails,
   onToggleLock
 }: ClassBoardProps) {
   
@@ -64,12 +66,12 @@ export function ClassBoard({
           <div>
             <h3 className="font-extrabold text-gray-900 tracking-tight">{classInfo.name}</h3>
             {classInfo.externalSlots && (
-              <div className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5 no-print">
+              <div className={`text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5 no-print ${hideDetails ? 'hidden' : ''}`}>
                 + {classInfo.externalSlots} eksterne pladser
               </div>
             )}
           </div>
-          <div className={`text-[11px] font-black px-2.5 py-1 rounded-lg border shadow-sm flex items-center gap-1.5 no-print ${isFull ? 'bg-orange-100 border-orange-200 text-orange-700' : 'bg-white border-gray-100 text-gray-700'}`}>
+          <div className={`text-[11px] font-black px-2.5 py-1 rounded-lg border shadow-sm flex items-center gap-1.5 no-print ${hideDetails ? 'hidden' : ''} ${isFull ? 'bg-orange-100 border-orange-200 text-orange-700' : 'bg-white border-gray-100 text-gray-700'}`}>
             <Users size={12} strokeWidth={2.5} />
             <span>
               {students.length} {classInfo.maxInternal ? `/ ${classInfo.maxInternal}` : ''}
@@ -77,7 +79,7 @@ export function ClassBoard({
           </div>
         </div>
 
-        <div className="flex flex-col gap-2.5 no-print">
+        <div className={`flex flex-col gap-2.5 no-print ${hideDetails ? 'hidden' : ''}`}>
           <div className="flex justify-between items-center bg-white/60 backdrop-blur-sm px-2.5 py-1.5 rounded-xl border border-white/40 shadow-sm">
             <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Kønsbalance (D/P)</span>
             <span className="text-xs font-black font-mono">
@@ -144,6 +146,7 @@ export function ClassBoard({
               onDragStart={onDragStart}
               isBulkMode={isBulkMode}
               isPrivacyMode={isPrivacyMode}
+              hideDetails={hideDetails}
               onToggleLock={onToggleLock}
             />
           ))}

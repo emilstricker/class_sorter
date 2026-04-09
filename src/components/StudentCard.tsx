@@ -9,10 +9,11 @@ interface StudentCardProps {
   onDragStart: (e: React.DragEvent, studentId: string) => void;
   isBulkMode?: boolean;
   isPrivacyMode?: boolean;
+  hideDetails?: boolean;
   onToggleLock?: (studentId: string) => void;
 }
 
-export function StudentCard({ student, onClick, onDragStart, isBulkMode, isPrivacyMode, onToggleLock }: StudentCardProps) {
+export function StudentCard({ student, onClick, onDragStart, isBulkMode, isPrivacyMode, hideDetails, onToggleLock }: StudentCardProps) {
   const genderColor = 
     student.gender === 'Boy' ? 'bg-blue-500' : 
     student.gender === 'Girl' ? 'bg-pink-500' : 
@@ -54,10 +55,10 @@ export function StudentCard({ student, onClick, onDragStart, isBulkMode, isPriva
       </div>
       
       {/* Gender Badge */}
-      <div className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm z-10 no-print ${genderColor}`} />
+      <div className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm z-10 no-print ${genderColor} ${hideDetails ? 'hidden' : ''}`} />
 
       {/* Special Designation Badges */}
-      <div className="absolute top-1.5 left-1.5 flex flex-col gap-1 z-10 pointer-events-none no-print">
+      <div className={`absolute top-1.5 left-1.5 flex flex-col gap-1 z-10 pointer-events-none no-print ${hideDetails ? 'hidden' : ''}`}>
         {student.isDSA && (
           <span className="bg-indigo-600/90 backdrop-blur-sm text-white text-[8px] font-bold px-1 rounded shadow-sm border border-white/20" title="DSA">
             DSA
@@ -70,7 +71,7 @@ export function StudentCard({ student, onClick, onDragStart, isBulkMode, isPriva
         )}
       </div>
 
-      <div className="absolute top-1.5 right-5 flex flex-col gap-1 z-10 pointer-events-none items-end no-print">
+      <div className={`absolute top-1.5 right-5 flex flex-col gap-1 z-10 pointer-events-none items-end no-print ${hideDetails ? 'hidden' : ''}`}>
         {student.avoidNestClass && (
           <div className="bg-gray-900/80 backdrop-blur-sm text-white p-0.5 rounded shadow-sm border border-white/10" title="Undgå NEST">
             <Ban size={8} />
@@ -85,7 +86,7 @@ export function StudentCard({ student, onClick, onDragStart, isBulkMode, isPriva
 
       {/* Lock Button */}
       {student.classId && !isBulkMode && (
-        <div className="absolute top-1.5 left-1.5 z-20 no-print">
+        <div className={`absolute top-1.5 left-1.5 z-20 no-print ${hideDetails ? 'hidden' : ''}`}>
           {student.isLocked ? (
             <button 
               onClick={(e) => { e.stopPropagation(); onToggleLock?.(student.id); }} 
@@ -114,7 +115,7 @@ export function StudentCard({ student, onClick, onDragStart, isBulkMode, isPriva
       </div>
 
       {/* Info Overlay */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-2 pt-6 flex flex-col gap-1 pointer-events-none z-10 no-print">
+      <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-2 pt-6 flex flex-col gap-1 pointer-events-none z-10 no-print ${hideDetails ? 'hidden' : ''}`}>
         <span className={`text-[10px] font-bold text-white truncate leading-tight tracking-tight ${isPrivacyMode ? 'blur-[4px] select-none opacity-50' : ''}`}>
           {isPrivacyMode ? '••••••••' : (student.name || 'Navnløs')}
         </span>
