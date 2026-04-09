@@ -47,7 +47,7 @@ export function StudentCard({ student, onClick, onDragStart, isBulkMode, isPriva
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50">
+          <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50 print:bg-white print:text-gray-400">
             <User size={32} strokeWidth={1.5} />
           </div>
         )}
@@ -107,8 +107,8 @@ export function StudentCard({ student, onClick, onDragStart, isBulkMode, isPriva
       )}
 
       {/* Print-only name */}
-      <div className="hidden print:block absolute inset-0 bg-white p-1 text-center flex items-center justify-center">
-        <span className="text-[10pt] font-bold text-black leading-tight">
+      <div className="hidden print:flex absolute inset-x-0 bottom-0 bg-white p-1 text-center items-center justify-center border-t border-gray-100 z-30">
+        <span className="text-[8pt] font-bold text-black truncate w-full px-0.5">
           {student.name}
         </span>
       </div>

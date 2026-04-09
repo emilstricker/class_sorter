@@ -59,7 +59,7 @@ export function ClassBoard({
       onDragOver={onDragOver}
     >
       {/* Header Stats */}
-      <div className={`p-4 border-b ${isFull ? 'bg-orange-50/50' : 'bg-gray-50/50'} backdrop-blur-sm`}>
+      <div className={`p-4 border-b ${isFull ? 'bg-orange-50/50' : 'bg-gray-50/50'} backdrop-blur-sm print:bg-white`}>
         <div className="flex justify-between items-start mb-3">
           <div>
             <h3 className="font-extrabold text-gray-900 tracking-tight">{classInfo.name}</h3>

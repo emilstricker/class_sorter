@@ -75,10 +75,13 @@
     transition: none !important;
     border: 1px solid #eee !important;
     box-shadow: none !important;
+    background: white !important;
   }
 
   .student-card img {
-    display: none !important;
+    display: block !important;
+    filter: none !important;
+    opacity: 1 !important;
   }
 
   /* Ensure text is black */
