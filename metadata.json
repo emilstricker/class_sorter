@@ -1,0 +1,5 @@
+{
+  "name": "Class Sorter Pro",
+  "description": "Drag and drop application to sort students into classes with constraints, gender balancing, and ability tracking.",
+  "requestFramePermissions": ["allow-modals"]
+}
