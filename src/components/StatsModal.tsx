@@ -62,6 +62,9 @@ export function StatsModal({ students, classes, onClose }: StatsModalProps) {
   // Class-wise statistics
   const classStats = classes.map(c => {
     const classStudents = assignedStudents.filter(s => s.classId === c.id);
+    const nestExternalCount = classStudents.filter(s => s.isNestExternal).length;
+    const internalCount = classStudents.length - nestExternalCount;
+    
     const boys = classStudents.filter(s => s.gender === 'Boy').length;
     const girls = classStudents.filter(s => s.gender === 'Girl').length;
     const others = classStudents.filter(s => s.gender === 'Other').length;
@@ -74,6 +77,8 @@ export function StatsModal({ students, classes, onClose }: StatsModalProps) {
     return {
       ...c,
       count: classStudents.length,
+      internalCount,
+      nestExternalCount,
       boys,
       girls,
       others,
@@ -180,7 +185,14 @@ export function StatsModal({ students, classes, onClose }: StatsModalProps) {
                   {classStats.map(s => (
                     <tr key={s.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-bold text-gray-800">{s.name}</td>
-                      <td className="px-4 py-3 text-center">{s.count}</td>
+                      <td className="px-4 py-3 text-center">
+                        <div>{s.count}</div>
+                        {s.externalSlots ? (
+                          <div className="text-[10px] text-gray-400 font-medium">
+                            ({s.internalCount} int. + {s.nestExternalCount} ekst.)
+                          </div>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-3 text-center">
                         <span className="text-pink-600">{s.girls}</span> / <span className="text-blue-600">{s.boys}</span> / <span className="text-purple-600">{s.others}</span>
                       </td>

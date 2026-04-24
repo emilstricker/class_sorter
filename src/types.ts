@@ -18,9 +18,13 @@ export interface Student {
   isDSA?: boolean; // Dansk som andetsprog (ESL)
   isSPS?: boolean; // + 9 (Special Needs)
   isMedical?: boolean;
+  isDyslexic?: boolean;
+  isExtraAttention?: boolean;
+  extraAttentionNotes?: string;
   wishes?: string[]; // Prioritized list of student IDs
   avoidNestClass?: boolean;
   preferNestClass?: boolean;
+  isNestExternal?: boolean;
 }
 
 export interface ClassInfo {

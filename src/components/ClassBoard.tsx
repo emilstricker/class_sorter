@@ -51,8 +51,9 @@ export function ClassBoard({
   const dsaCount = students.filter(s => s.isDSA).length;
   const spsCount = students.filter(s => s.isSPS).length;
   const medCount = students.filter(s => s.isMedical).length;
+  const nestExternalCount = students.filter(s => s.isNestExternal).length;
 
-  const isFull = classInfo.maxInternal && students.length >= classInfo.maxInternal;
+  const isFull = classInfo.maxInternal && (students.length - nestExternalCount) >= classInfo.maxInternal;
 
   return (
     <div 
@@ -67,14 +68,14 @@ export function ClassBoard({
             <h3 className="font-extrabold text-gray-900 tracking-tight">{classInfo.name}</h3>
             {classInfo.externalSlots && (
               <div className={`text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5 no-print ${hideDetails ? 'hidden' : ''}`}>
-                + {classInfo.externalSlots} eksterne pladser
+                + {classInfo.externalSlots} eksterne pladser ({nestExternalCount} brugt)
               </div>
             )}
           </div>
           <div className={`text-[11px] font-black px-2.5 py-1 rounded-lg border shadow-sm flex items-center gap-1.5 no-print ${hideDetails ? 'hidden' : ''} ${isFull ? 'bg-orange-100 border-orange-200 text-orange-700' : 'bg-white border-gray-100 text-gray-700'}`}>
             <Users size={12} strokeWidth={2.5} />
             <span>
-              {students.length} {classInfo.maxInternal ? `/ ${classInfo.maxInternal}` : ''}
+              {students.length} {classInfo.maxInternal ? `/ ${classInfo.maxInternal + nestExternalCount}` : ''}
             </span>
           </div>
         </div>

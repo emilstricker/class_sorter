@@ -5,6 +5,7 @@ import { ClassBoard } from './components/ClassBoard';
 import { EditModal } from './components/EditModal';
 import { StatsModal } from './components/StatsModal';
 import { StudentTableView } from './components/StudentTableView';
+import { SmartImportModal } from './components/SmartImportModal';
 import { Upload, Users, AlertCircle, Trash2, Loader2, List, Wand2, RotateCcw, Eye, EyeOff, Download, UploadCloud, ShieldCheck, Settings, X, ArrowUpDown, Search, BarChart3, Printer, Layout } from 'lucide-react';
 
 type SortField = 'name' | 'abilityLevel' | 'socialSkill' | 'behavioralIntensity' | 'supportLevel';
@@ -92,6 +93,7 @@ export default function App() {
   const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showSmartImportModal, setShowSmartImportModal] = useState(false);
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
   const [hideCardDetails, setHideCardDetails] = useState(false);
@@ -229,9 +231,17 @@ export default function App() {
 
     if (targetClassId) {
       const targetClass = CLASSES.find(c => c.id === targetClassId);
+      const movingStudent = students.find(s => s.id === studentId);
+
+      // If student is NestExternal, they MUST stay in NEST class
+      if (movingStudent?.isNestExternal && targetClassId !== 'class-nest') {
+        showToast("Visiterede elever skal blive i NEST-klassen.");
+        return;
+      }
+
       if (targetClass?.maxInternal) {
-        const currentCount = students.filter(s => s.classId === targetClassId && s.id !== studentId).length;
-        if (currentCount >= targetClass.maxInternal) {
+        const currentInternalCount = students.filter(s => s.classId === targetClassId && s.id !== studentId && !s.isNestExternal).length;
+        if (currentInternalCount >= targetClass.maxInternal && !movingStudent?.isNestExternal) {
           showToast(`Kan ikke tilføje til ${targetClass.name}. Maksimal kapacitet på ${targetClass.maxInternal} nået.`);
           return;
         }
@@ -244,6 +254,11 @@ export default function App() {
   };
 
   const handleSaveStudent = (updated: Student) => {
+    // If marked as NEST-external, auto-assign to NEST class
+    if (updated.isNestExternal) {
+      updated.classId = 'class-nest';
+    }
+
     setStudents(prev => prev.map(s => {
       if (s.id === updated.id) return updated;
       
@@ -603,6 +618,39 @@ export default function App() {
     }
   };
 
+  const handleSmartImport = (parsedData: any[]) => {
+    setStudents(prevStudents => {
+      const newStudents = [...prevStudents];
+      
+      parsedData.forEach(data => {
+        const studentIndex = newStudents.findIndex(s => s.id === data.studentId);
+        if (studentIndex === -1) return; // Skip if not found
+        
+        const student = { ...newStudents[studentIndex] };
+        
+        if (data.notes) student.notes = (student.notes ? student.notes + '\n' : '') + data.notes;
+        if (data.preferNestClass) student.preferNestClass = true;
+        if (data.isNestExternal) student.isNestExternal = true;
+        if (data.isDyslexic) student.isDyslexic = true;
+        if (data.isExtraAttention) student.isExtraAttention = true;
+        if (data.extraAttentionNotes) student.extraAttentionNotes = data.extraAttentionNotes;
+        
+        if (data.wishesIds && Array.isArray(data.wishesIds)) {
+          student.wishes = [...new Set([...(student.wishes || []), ...data.wishesIds])];
+        }
+        
+        if (data.conflictsIds && Array.isArray(data.conflictsIds)) {
+          student.conflicts = [...new Set([...(student.conflicts || []), ...data.conflictsIds])];
+        }
+        
+        newStudents[studentIndex] = student;
+      });
+
+      return newStudents;
+    });
+    showToast(`Importerede relationer for ${parsedData.length} elever.`);
+  };
+
   const handlePrint = () => {
     window.print();
     setShowPrintHint(true);
@@ -945,6 +993,13 @@ export default function App() {
               <section>
                 <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Datastyring</h3>
                 <div className="space-y-2">
+                  <button 
+                    onClick={() => { setShowSettingsModal(false); setShowSmartImportModal(true); }}
+                    className="w-full flex items-center justify-center gap-2 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-2"
+                  >
+                    <Wand2 size={16} />
+                    Smart Import (AI) fra noter
+                  </button>
                   <div className="grid grid-cols-2 gap-2">
                     <button 
                       onClick={() => { setShowSettingsModal(false); handleExport(); }}
@@ -1016,6 +1071,12 @@ export default function App() {
           onClose={() => setShowStatsModal(false)} 
         />
       )}
+      <SmartImportModal
+        isOpen={showSmartImportModal}
+        onClose={() => setShowSmartImportModal(false)}
+        onImport={handleSmartImport}
+        existingStudents={students.map(s => ({ id: s.id, name: s.name }))}
+      />
     </div>
   );
 }

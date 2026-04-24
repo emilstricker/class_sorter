@@ -100,6 +100,9 @@ export function StudentTableView({ students, classes, onUpdateStudent, onStudent
               <th className="px-4 py-3 font-medium text-center">Låst</th>
               <th className="px-4 py-3 font-medium text-center" title="Undgå NEST">Undgå NEST</th>
               <th className="px-4 py-3 font-medium text-center" title="Foretræk NEST">Ønsker NEST</th>
+              <th className="px-4 py-3 font-medium text-center">Ordblind</th>
+              <th className="px-4 py-3 font-medium text-center">Skærpet</th>
+              <th className="px-4 py-3 font-medium text-center" title="NEST Ekstern">NEST-E</th>
             </tr>
           </thead>
           <tbody>
@@ -210,11 +213,35 @@ export function StudentTableView({ students, classes, onUpdateStudent, onStudent
                     className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
                   />
                 </td>
+                <td className="px-4 py-2 text-center">
+                  <input 
+                    type="checkbox" 
+                    checked={student.isDyslexic || false}
+                    onChange={(e) => handleChange(student, 'isDyslexic', e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                  />
+                </td>
+                <td className="px-4 py-2 text-center">
+                  <input 
+                    type="checkbox" 
+                    checked={student.isExtraAttention || false}
+                    onChange={(e) => handleChange(student, 'isExtraAttention', e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                  />
+                </td>
+                <td className="px-4 py-2 text-center">
+                  <input 
+                    type="checkbox" 
+                    checked={student.isNestExternal || false}
+                    onChange={(e) => handleChange(student, 'isNestExternal', e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                  />
+                </td>
               </tr>
             ))}
             {sortedStudents.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
                   Ingen elever fundet.
                 </td>
               </tr>

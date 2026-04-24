@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Gender, Level } from '../types';
-import { X, Search, Brain, HeartHandshake, Zap, ShieldPlus, Tags, ChevronUp, ChevronDown, Star } from 'lucide-react';
+import { X, Search, Brain, HeartHandshake, Zap, ShieldPlus, Tags, ChevronUp, ChevronDown, Star, BookOpenCheck, AlertTriangle } from 'lucide-react';
 
 interface EditModalProps {
   student: Student;
@@ -288,8 +288,45 @@ export function EditModal({ student, allStudents, onSave, onClose, onDelete }: E
                     />
                     Medicinsk
                   </label>
+                  <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      name="isDyslexic" 
+                      checked={formData.isDyslexic || false} 
+                      onChange={handleChange}
+                      className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                    />
+                    Ordblind
+                  </label>
+                  <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      name="isExtraAttention" 
+                      checked={formData.isExtraAttention || false} 
+                      onChange={handleChange}
+                      className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                    />
+                    Skærpet opmærksomhed
+                  </label>
                 </div>
               </div>
+
+              {formData.isExtraAttention && (
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex flex-col gap-2">
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-amber-800 uppercase tracking-wider">
+                    <AlertTriangle size={14} />
+                    Noter til skærpet opmærksomhed
+                  </label>
+                  <textarea 
+                    name="extraAttentionNotes" 
+                    value={formData.extraAttentionNotes || ''} 
+                    onChange={handleChange}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-amber-300 rounded-md text-sm focus:ring-2 focus:ring-amber-500 outline-none resize-none bg-white"
+                    placeholder="Angst, bulimi eller andre forhold der kræver opmærksomhed..."
+                  />
+                </div>
+              )}
 
               <div className="flex items-center gap-2 mt-2">
                 <input 
@@ -330,6 +367,20 @@ export function EditModal({ student, allStudents, onSave, onClose, onDelete }: E
                 />
                 <label htmlFor="preferNestClass" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
                   Foretræk NEST-klasse
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="isNestExternal" 
+                  name="isNestExternal" 
+                  checked={formData.isNestExternal || false} 
+                  onChange={handleChange}
+                  className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                />
+                <label htmlFor="isNestExternal" className="text-sm font-bold text-emerald-700 cursor-pointer select-none">
+                  Visiteret til NEST ekstern plads (de 5 pladser)
                 </label>
               </div>
 

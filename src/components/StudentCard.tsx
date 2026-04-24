@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Student } from '../types';
-import { User, Brain, HeartHandshake, Zap, ShieldPlus, Lock, Unlock, Star, Ban, Heart } from 'lucide-react';
+import { User, Brain, HeartHandshake, Zap, ShieldPlus, Lock, Unlock, Star, Ban, Heart, BookOpenCheck, AlertTriangle } from 'lucide-react';
 
 interface StudentCardProps {
   student: Student;
@@ -37,7 +37,7 @@ export function StudentCard({ student, onClick, onDragStart, isBulkMode, isPriva
       className={`relative w-[88px] h-[124px] rounded-xl overflow-hidden shadow-sm transition-all group bg-white border border-gray-100 flex-shrink-0 student-card ${
         isBulkMode ? 'cursor-default' : student.isLocked ? 'cursor-default' : 'cursor-grab active:cursor-grabbing hover:shadow-lg hover:ring-2 hover:ring-indigo-500/50'
       }`}
-      title={`${student.name}\nFagligt: ${student.abilityLevel}\nSocialt: ${student.socialSkill}\nAdfærd: ${student.behavioralIntensity}\nStøtte: ${student.supportLevel}${student.isLocked ? '\n(Låst)' : ''}`}
+      title={`${student.name}\nFagligt: ${student.abilityLevel}\nSocialt: ${student.socialSkill}\nAdfærd: ${student.behavioralIntensity}\nStøtte: ${student.supportLevel}${student.isLocked ? '\n(Låst)' : ''}${student.isDyslexic ? '\nOrdblind' : ''}${student.isExtraAttention ? `\nSkærpet opmærksomhed: ${student.extraAttentionNotes || ''}` : ''}`}
     >
       <div className="absolute inset-0 bg-gray-50 flex items-center justify-center">
         {student.photoUrl ? (
@@ -67,6 +67,21 @@ export function StudentCard({ student, onClick, onDragStart, isBulkMode, isPriva
         {student.isSPS && (
           <span className="bg-emerald-600/90 backdrop-blur-sm text-white text-[8px] font-bold px-1 rounded shadow-sm border border-white/20" title="+ 9">
             + 9
+          </span>
+        )}
+        {student.isDyslexic && (
+          <div className="bg-amber-500/90 backdrop-blur-sm text-white p-0.5 rounded shadow-sm border border-white/20" title="Ordblind">
+            <BookOpenCheck size={8} />
+          </div>
+        )}
+        {student.isExtraAttention && (
+          <div className="bg-rose-500/90 backdrop-blur-sm text-white p-0.5 rounded shadow-sm border border-white/20" title="Skærpet opmærksomhed">
+            <AlertTriangle size={8} />
+          </div>
+        )}
+        {student.isNestExternal && (
+          <span className="bg-emerald-700 backdrop-blur-sm text-white text-[7px] font-black px-1 rounded shadow-sm border border-white/30 text-center leading-tight" title="NEST Ekstern (Visiteret)">
+            NEST-E
           </span>
         )}
       </div>
