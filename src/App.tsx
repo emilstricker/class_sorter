@@ -180,7 +180,8 @@ export default function App() {
     if (!user || !activeWorkspace) return;
     
     // Listen to students
-    const unsubStudents = onSnapshot(collection(db, 'workspaces', activeWorkspace.id, 'students'), (snapshot) => {
+    const qStudents = query(collection(db, 'workspaces', activeWorkspace.id, 'students'), where('members', 'array-contains', user.uid));
+    const unsubStudents = onSnapshot(qStudents, (snapshot) => {
       const loaded: Student[] = [];
       snapshot.forEach(doc => {
         loaded.push(doc.data() as Student);
@@ -833,7 +834,7 @@ export default function App() {
       batch.delete(doc(db, 'workspaces', activeWorkspace.id, 'joinRequests', req.userId));
       
       // update all students in workspace!
-      const studentsQuery = await getDocs(collection(db, 'workspaces', activeWorkspace.id, 'students'));
+      const studentsQuery = await getDocs(query(collection(db, 'workspaces', activeWorkspace.id, 'students'), where('members', 'array-contains', user.uid)));
       studentsQuery.forEach(docSnap => {
         batch.update(docSnap.ref, { members: newMembers });
       });
