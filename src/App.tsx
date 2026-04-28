@@ -59,6 +59,8 @@ const processImage = (file: File): Promise<string> => {
 export default function App() {
   const { user, signOut } = useAuth();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [workspacesLoaded, setWorkspacesLoaded] = useState(false);
+  const [joinDialogDetails, setJoinDialogDetails] = useState<{ id: string, requested: boolean, error?: string } | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -88,93 +90,73 @@ export default function App() {
       const w: Workspace[] = [];
       snapshot.forEach(doc => w.push(doc.data() as Workspace));
       setWorkspaces(w);
+      setWorkspacesLoaded(true);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'workspaces');
     });
     return unsubscribe;
   }, [user]);
 
-  // Handle active workspace and first-time setup
+  // Handle active workspace and join logic
   useEffect(() => {
-    if (!user) return;
+    if (!user || !workspacesLoaded) return;
     
+    // Process URL parameter
     const params = new URLSearchParams(window.location.search);
     const joinId = params.get('join');
 
-    if (workspaces.length > 0) {
-      if (joinId && workspaces.some(w => w.id === joinId)) {
+    if (joinId) {
+      if (workspaces.some(w => w.id === joinId)) {
+        // Already a member, select it
         setActiveWorkspace(workspaces.find(w => w.id === joinId)!);
         window.history.replaceState({}, '', '/');
-      } else if (!activeWorkspace || !workspaces.some(w => w.id === activeWorkspace.id)) {
+        showToast("Du er allerede medlem af dette arbejdsrum.");
+      } else {
+        // Show join dialog if not requested yet
+        setJoinDialogDetails({ id: joinId, requested: false });
+        window.history.replaceState({}, '', '/'); // Remove from URL to avoid loop
+      }
+    } else {
+      // Normal flow - select workspace if nothing active
+      if (workspaces.length > 0 && (!activeWorkspace || !workspaces.some(w => w.id === activeWorkspace.id))) {
         setActiveWorkspace(workspaces[0]);
+      } else if (workspaces.length === 0) {
+        // Create new default workspace if user literally has none
+        const createDefault = async () => {
+          const newId = doc(collection(db, 'workspaces')).id;
+          const newWs: Workspace = {
+             id: newId,
+             name: 'Min Skole',
+             ownerId: user.uid,
+             members: [user.uid],
+             numClasses: 3
+          };
+          try {
+            await setDoc(doc(db, 'workspaces', newId), newWs);
+            const oldQuery = await getDocs(collection(db, 'users', user.uid, 'students'));
+            if (!oldQuery.empty) {
+              const batch = writeBatch(db);
+              let count = 0;
+              oldQuery.forEach(docSnap => {
+                const data = docSnap.data() as Student;
+                data.workspaceId = newId;
+                data.members = [user.uid];
+                batch.set(doc(db, 'workspaces', newId, 'students', data.id), data);
+                count++;
+              });
+              if (count > 0) {
+                await batch.commit();
+                showToast(`Migrerede ${count} elever til dit nye arbejdsrum!`);
+              }
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        };
+        createDefault();
       }
     }
-  }, [user, workspaces, activeWorkspace]);
-
-  useEffect(() => {
-    if (!user) return;
-    let isActive = true;
-
-    const init = setTimeout(async () => {
-      // If after 1.5 seconds we still have no workspaces, assume we need to act
-      if (!isActive || workspaces.length > 0) return;
-      
-      const params = new URLSearchParams(window.location.search);
-      const joinId = params.get('join');
-
-      if (joinId) {
-        try {
-          await setDoc(doc(db, 'workspaces', joinId, 'joinRequests', user.uid), {
-           userId: user.uid,
-           email: user.email || 'Ukendt'
-          });
-          showToast("Anmodning om adgang er sendt! Venter på godkendelse...");
-          window.history.replaceState({}, '', '/');
-        } catch (e) {
-          console.error(e);
-          showToast("Kunne ikke sende anmodning - projektet findes måske ikke.");
-          window.history.replaceState({}, '', '/');
-        }
-        return;
-      }
-
-      // Create new default workspace
-      const newId = doc(collection(db, 'workspaces')).id;
-      const newWs: Workspace = {
-         id: newId,
-         name: 'Min Skole',
-         ownerId: user.uid,
-         members: [user.uid],
-         numClasses: 3
-      };
-      try {
-        await setDoc(doc(db, 'workspaces', newId), newWs);
-        const oldQuery = await getDocs(collection(db, 'users', user.uid, 'students'));
-        if (!oldQuery.empty) {
-          const batch = writeBatch(db);
-          let count = 0;
-          oldQuery.forEach(docSnap => {
-            const data = docSnap.data() as Student;
-            data.workspaceId = newId;
-            data.members = [user.uid];
-            batch.set(doc(db, 'workspaces', newId, 'students', data.id), data);
-            count++;
-          });
-          if (count > 0) {
-            await batch.commit();
-            showToast(`Migrerede ${count} elever til dit nye arbejdsrum!`);
-          }
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }, 1500);
-
-    return () => {
-      isActive = false;
-      clearTimeout(init);
-    };
-  }, [user, workspaces.length]);
+  }, [user, workspacesLoaded, workspaces.length, activeWorkspace]);
 
   useEffect(() => {
     if (!user || !activeWorkspace) return;
@@ -1350,6 +1332,85 @@ export default function App() {
         onImport={handleSmartImport}
         existingStudents={students.map(s => ({ id: s.id, name: s.name }))}
       />
+      {joinDialogDetails && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col p-6 items-center text-center">
+            {joinDialogDetails.requested ? (
+              <>
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+                  <Check size={32} />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Anmodning sendt!</h2>
+                <p className="text-gray-600 text-sm mb-6">
+                  Ejeren af projektet skal nu godkende dig. Du får adgang, lige så snart de har accepteret.
+                </p>
+                <div className="flex gap-2 w-full">
+                  <button 
+                    onClick={() => setJoinDialogDetails(null)}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2.5 rounded-xl font-bold transition-all active:scale-95"
+                  >
+                    Forstået
+                  </button>
+                </div>
+              </>
+            ) : joinDialogDetails.error ? (
+              <>
+                <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4">
+                  <AlertCircle size={32} />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Fejl</h2>
+                <p className="text-gray-600 text-sm mb-6">
+                  {joinDialogDetails.error}
+                </p>
+                <div className="flex gap-2 w-full">
+                  <button 
+                    onClick={() => setJoinDialogDetails(null)}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2.5 rounded-xl font-bold transition-all active:scale-95"
+                  >
+                    Luk
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4">
+                  <Users size={32} />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Deltag i projekt</h2>
+                <p className="text-gray-600 text-sm mb-6">
+                  Du er blevet inviteret til et delt projekt. Vil du anmode om adgang?
+                </p>
+                <div className="flex gap-2 w-full flex-col">
+                  <button 
+                    onClick={async () => {
+                      if (!user) return;
+                      try {
+                        await setDoc(doc(db, 'workspaces', joinDialogDetails.id, 'joinRequests', user.uid), {
+                          userId: user.uid,
+                          email: user.email || 'Ukendt'
+                        });
+                        setJoinDialogDetails({ ...joinDialogDetails, requested: true });
+                      } catch (e) {
+                         console.error(e);
+                         setJoinDialogDetails({ ...joinDialogDetails, error: "Projektet findes ikke, eller der skete en fejl." });
+                      }
+                    }}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all active:scale-95"
+                  >
+                    Anmod om adgang
+                  </button>
+                  <button 
+                    onClick={() => setJoinDialogDetails(null)}
+                    className="w-full bg-transparent hover:bg-gray-50 text-gray-500 px-4 py-2.5 rounded-xl font-bold transition-all active:scale-95"
+                  >
+                    Annuller
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
