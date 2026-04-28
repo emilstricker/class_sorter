@@ -149,7 +149,7 @@ export function StudentTableView({ students, classes, onUpdateStudent, onStudent
                     onChange={(e) => handleChange(student, 'abilityLevel', Number(e.target.value) as Level)}
                     className="bg-transparent border border-gray-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   >
-                    {[1, 2, 3, 4, 5].map(l => <option key={l} value={l}>{l}</option>)}
+                    {[1, 2, 3, 4, 5].map(l => <option key={l} value={l}>{l} - {l === 1 ? 'Lav' : l === 5 ? 'Høj' : 'Gns'}</option>)}
                   </select>
                 </td>
                 <td className="px-4 py-2">
@@ -158,7 +158,7 @@ export function StudentTableView({ students, classes, onUpdateStudent, onStudent
                     onChange={(e) => handleChange(student, 'socialSkill', Number(e.target.value) as Level)}
                     className="bg-transparent border border-gray-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   >
-                    {[1, 2, 3, 4, 5].map(l => <option key={l} value={l}>{l}</option>)}
+                    {[1, 2, 3, 4, 5].map(l => <option key={l} value={l}>{l} - {l === 1 ? 'Lav' : l === 5 ? 'Høj' : 'Gns'}</option>)}
                   </select>
                 </td>
                 <td className="px-4 py-2">
@@ -167,7 +167,7 @@ export function StudentTableView({ students, classes, onUpdateStudent, onStudent
                     onChange={(e) => handleChange(student, 'behavioralIntensity', Number(e.target.value) as Level)}
                     className="bg-transparent border border-gray-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   >
-                    {[1, 2, 3, 4, 5].map(l => <option key={l} value={l}>{l}</option>)}
+                    {[1, 2, 3, 4, 5].map(l => <option key={l} value={l}>{l} - {l === 1 ? 'Rolig' : l === 5 ? 'Intens' : 'Gns'}</option>)}
                   </select>
                 </td>
                 <td className="px-4 py-2">
@@ -176,7 +176,7 @@ export function StudentTableView({ students, classes, onUpdateStudent, onStudent
                     onChange={(e) => handleChange(student, 'supportLevel', Number(e.target.value) as Level)}
                     className="bg-transparent border border-gray-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   >
-                    {[1, 2, 3, 4, 5].map(l => <option key={l} value={l}>{l}</option>)}
+                    {[1, 2, 3, 4, 5].map(l => <option key={l} value={l}>{l} - {l === 1 ? 'Selvst.' : l === 5 ? '1-til-1' : 'Gns'}</option>)}
                   </select>
                 </td>
                 <td className="px-4 py-2">

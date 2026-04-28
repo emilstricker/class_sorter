@@ -63,6 +63,8 @@ export default function App() {
   const prevWorkspaces = useRef<Workspace[]>([]);
   const [joinDialogDetails, setJoinDialogDetails] = useState<{ id: string, requested: boolean, error?: string } | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
+  const [userSettings, setUserSettings] = useState<{ activeWorkspaceId?: string } | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -86,6 +88,18 @@ export default function App() {
   // Listen to workspaces
   useEffect(() => {
     if (!user) return;
+    
+    // Listen to settings
+    const unsubSettings = onSnapshot(doc(db, 'users', user.uid, 'settings', 'main'), (docSnap) => {
+      if (docSnap.exists()) {
+        setUserSettings(docSnap.data() as any);
+      }
+      setSettingsLoaded(true);
+    }, (error) => {
+      console.error("Settings error:", error);
+      setSettingsLoaded(true); // Don't block
+    });
+
     const q = query(collection(db, 'workspaces'), where('members', 'array-contains', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const w: Workspace[] = [];
@@ -103,6 +117,16 @@ export default function App() {
                showToast(`Skiftede til det nye arbejdsrum: ${addedWorkspace.name}`);
             }
          }
+      } else {
+         // Update activeWorkspace if its properties changed
+         setActiveWorkspace(prev => {
+            if (!prev) return null;
+            const updated = w.find(x => x.id === prev.id);
+            if (updated && JSON.stringify(updated) !== JSON.stringify(prev)) {
+               return updated;
+            }
+            return prev;
+         });
       }
       prevWorkspaces.current = w;
       
@@ -111,12 +135,15 @@ export default function App() {
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'workspaces');
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      unsubSettings();
+    };
   }, [user]);
 
   // Handle active workspace and join logic
   useEffect(() => {
-    if (!user || !workspacesLoaded) return;
+    if (!user || !workspacesLoaded || !settingsLoaded) return;
     
     // Process URL parameter
     const params = new URLSearchParams(window.location.search);
@@ -136,7 +163,15 @@ export default function App() {
     } else {
       // Normal flow - select workspace if nothing active
       if (workspaces.length > 0 && (!activeWorkspace || !workspaces.some(w => w.id === activeWorkspace.id))) {
-        setActiveWorkspace(workspaces[0]);
+        let savedWorkspace = null;
+        if (userSettings?.activeWorkspaceId) {
+          savedWorkspace = workspaces.find(w => w.id === userSettings.activeWorkspaceId);
+        }
+        if (!savedWorkspace) {
+          const savedId = localStorage.getItem(`activeWorkspace_${user.uid}`);
+          savedWorkspace = savedId ? workspaces.find(w => w.id === savedId) : null;
+        }
+        setActiveWorkspace(savedWorkspace || workspaces[0]);
       } else if (workspaces.length === 0) {
         // Create new default workspace if user literally has none
         const createDefault = async () => {
@@ -174,6 +209,15 @@ export default function App() {
       }
     }
   }, [user, workspacesLoaded, workspaces.length, activeWorkspace]);
+
+  useEffect(() => {
+    if (user && activeWorkspace) {
+      localStorage.setItem(`activeWorkspace_${user.uid}`, activeWorkspace.id);
+      if (userSettings?.activeWorkspaceId !== activeWorkspace.id) {
+         setDoc(doc(db, 'users', user.uid, 'settings', 'main'), { activeWorkspaceId: activeWorkspace.id }, { merge: true }).catch(console.error);
+      }
+    }
+  }, [user, activeWorkspace, userSettings?.activeWorkspaceId]);
 
   useEffect(() => {
     if (!user || !activeWorkspace) return;
