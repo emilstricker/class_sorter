@@ -6,7 +6,8 @@ import { EditModal } from './components/EditModal';
 import { StatsModal } from './components/StatsModal';
 import { StudentTableView } from './components/StudentTableView';
 import { SmartImportModal } from './components/SmartImportModal';
-import { Upload, Users, AlertCircle, Trash2, Loader2, List, Wand2, RotateCcw, Eye, EyeOff, Download, UploadCloud, ShieldCheck, Settings, X, ArrowUpDown, Search, BarChart3, Printer, Layout, LogOut, Share2, Bell, Check } from 'lucide-react';
+import { Upload, Users, AlertCircle, Trash2, Loader2, List, Wand2, RotateCcw, Eye, EyeOff, Download, UploadCloud, ShieldCheck, Settings, X, ArrowUpDown, Search, BarChart3, Printer, Layout, LogOut, Share2, Bell, Check, Eraser } from 'lucide-react';
+import CleanupNamesModal from './components/CleanupNamesModal';
 import { useAuth } from './AuthContext';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDocs, query, where, updateDoc } from 'firebase/firestore';
@@ -75,6 +76,7 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [showSmartImportModal, setShowSmartImportModal] = useState(false);
+  const [showCleanupModal, setShowCleanupModal] = useState(false);
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
   const [hideCardDetails, setHideCardDetails] = useState(false);
@@ -972,6 +974,14 @@ export default function App() {
           </button>
 
           <button 
+            onClick={() => setShowCleanupModal(true)}
+            className={`flex items-center justify-center bg-white border border-gray-200 hover:border-indigo-200 hover:bg-indigo-50 text-gray-700 w-11 h-11 rounded-xl transition-all shadow-sm active:scale-95 group ${hideCardDetails ? 'hidden' : ''}`}
+            title="Ryd op i navne"
+          >
+            <Eraser size={20} className="text-gray-400 group-hover:text-indigo-600 transition-colors" />
+          </button>
+
+          <button 
             onClick={() => setShowStatsModal(true)}
             className={`flex items-center justify-center bg-white border border-gray-200 hover:border-indigo-200 hover:bg-indigo-50 text-gray-700 w-11 h-11 rounded-xl transition-all shadow-sm active:scale-95 group ${hideCardDetails ? 'hidden' : ''}`}
             title="Statistik"
@@ -1385,6 +1395,17 @@ export default function App() {
           students={students} 
           classes={CLASSES} 
           onClose={() => setShowStatsModal(false)} 
+        />
+      )}
+      {showCleanupModal && activeWorkspace && (
+        <CleanupNamesModal
+          students={students}
+          workspaceId={activeWorkspace.id}
+          onClose={() => setShowCleanupModal(false)}
+          onSuccess={(count) => {
+            setShowCleanupModal(false);
+            showToast(`Opdaterede ${count} navne!`);
+          }}
         />
       )}
       <SmartImportModal

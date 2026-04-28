@@ -71,9 +71,9 @@ export function StudentTableView({ students, classes, onUpdateStudent, onStudent
           Luk masseredigering
         </button>
       </div>
-      <div className="overflow-x-auto flex-1">
+      <div className="overflow-auto flex-1 min-h-0">
         <table className="w-full text-sm text-left">
-          <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+          <thead className="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0 z-10 shadow-sm">
             <tr>
               <th className="px-4 py-3 font-medium">Foto</th>
               <th className="px-4 py-3 font-medium cursor-pointer group" onClick={() => handleSort('name')}>
