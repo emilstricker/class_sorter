@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Represents a single student card with info and relationships.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "gender": { "type": "string", "enum": ["Boy", "Girl", "Other", "Unknown"] },
+        "abilityLevel": { "type": "number" },
+        "socialSkill": { "type": "number" },
+        "behavioralIntensity": { "type": "number" },
+        "supportLevel": { "type": "number" },
+        "friendships": { "type": "array", "items": { "type": "string" } },
+        "conflicts": { "type": "array", "items": { "type": "string" } },
+        "classId": { "type": ["string", "null"] },
+        "photoUrl": { "type": "string" },
+        "wishes": { "type": "array", "items": { "type": "string" } },
+        "avoidNestClass": { "type": "boolean" },
+        "preferNestClass": { "type": "boolean" },
+        "isNestExternal": { "type": "boolean" },
+        "isDSA": { "type": "boolean" },
+        "isSPS": { "type": "boolean" },
+        "isMedical": { "type": "boolean" },
+        "isDyslexic": { "type": "boolean" },
+        "isExtraAttention": { "type": "boolean" },
+        "extraAttentionNotes": { "type": "string" },
+        "notes": { "type": "string" },
+        "isLocked": { "type": "boolean" },
+        "workspaceId": { "type": "string" },
+        "members": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "name", "workspaceId", "members"]
+    },
+    "Workspace": {
+      "title": "Workspace",
+      "description": "Represents a collaborative class sorting project.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "members": { "type": "array", "items": { "type": "string" } },
+        "numClasses": { "type": "number" }
+      },
+      "required": ["id", "name", "ownerId", "members", "numClasses"]
+    },
+    "JoinRequest": {
+      "title": "JoinRequest",
+      "description": "Used when a user requests access via an invite link.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["userId", "email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/settings/{settingId}": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "activeWorkspaceId": { "type": "string" }
+        }
+      },
+      "description": "User specific settings"
+    },
+    "/users/{userId}/students/{studentId}": {
+      "schema": { "type": "object" },
+      "description": "Legacy students collection for migration purposes"
+    },
+    "/workspaces/{workspaceId}": {
+      "schema": { "$ref": "#/entities/Workspace" },
+      "description": "Shared collaborative workspaces"
+    },
+    "/workspaces/{workspaceId}/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Students in the workspace"
+    },
+    "/workspaces/{workspaceId}/joinRequests/{userId}": {
+      "schema": { "$ref": "#/entities/JoinRequest" },
+      "description": "Pending join requests for the workspace"
+    }
+  }
+}

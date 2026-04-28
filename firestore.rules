@@ -1,0 +1,107 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isValidStudent(data) {
+      return data.keys().hasAll(['id', 'name', 'workspaceId', 'members']) &&
+             data.id is string && data.id.size() > 0 &&
+             data.name is string && data.name.size() > 0 &&
+             data.name.size() <= 200 &&
+             data.workspaceId is string &&
+             data.members is list && data.members.size() > 0;
+    }
+    
+    function isValidSettings(data) {
+      return data.keys().hasAll(['activeWorkspaceId']) &&
+             data.activeWorkspaceId is string;
+    }
+
+    function isValidWorkspace(data) {
+      return data.keys().hasAll(['id', 'name', 'ownerId', 'members', 'numClasses']) &&
+             data.id is string &&
+             data.name is string &&
+             data.ownerId is string &&
+             data.members is list && data.members.size() > 0 &&
+             data.numClasses is number;
+    }
+
+    function isValidJoinRequest(data) {
+      return data.keys().hasAll(['userId', 'email']) &&
+             data.userId is string &&
+             data.email is string;
+    }
+
+    match /users/{userId} {
+      match /students/{studentId} {
+        // Legacy collection for migration
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+      
+      match /settings/{settingId} {
+        allow read: if isSignedIn() && request.auth.uid == userId;
+        allow list: if isSignedIn() && request.auth.uid == userId;
+        
+        allow create: if isSignedIn() &&
+                      request.auth.uid == userId &&
+                      isValidId(userId) &&
+                      isValidId(settingId) &&
+                      isValidSettings(incoming());
+
+        allow update: if isSignedIn() &&
+                      request.auth.uid == userId &&
+                      isValidSettings(incoming());
+                      
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+
+    match /workspaces/{workspaceId} {
+      allow read, list: if isSignedIn() && request.auth.uid in resource.data.members;
+      
+      allow create: if isSignedIn() &&
+                    incoming().ownerId == request.auth.uid &&
+                    request.auth.uid in incoming().members &&
+                    isValidWorkspace(incoming());
+                    
+      allow update: if isSignedIn() && 
+                    request.auth.uid in existing().members &&
+                    isValidWorkspace(incoming());
+                    
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+
+      match /joinRequests/{userId} {
+        allow create: if isSignedIn() &&
+                      userId == request.auth.uid &&
+                      incoming().userId == request.auth.uid &&
+                      isValidJoinRequest(incoming());
+                      
+        allow read, list, delete: if isSignedIn() && 
+                                  request.auth.uid in get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.members;
+      }
+
+      match /students/{studentId} {
+        allow list, read: if isSignedIn() && request.auth.uid in resource.data.members;
+        
+        allow create: if isSignedIn() && 
+                      request.auth.uid in incoming().members &&
+                      incoming().workspaceId == workspaceId &&
+                      isValidStudent(incoming());
+                      
+        allow update: if isSignedIn() && 
+                      request.auth.uid in existing().members &&
+                      request.auth.uid in incoming().members &&
+                      isValidStudent(incoming());
+                      
+        allow delete: if isSignedIn() && request.auth.uid in existing().members;
+      }
+    }
+  }
+}

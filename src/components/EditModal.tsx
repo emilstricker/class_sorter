@@ -384,6 +384,20 @@ export function EditModal({ student, allStudents, onSave, onClose, onDelete }: E
                 </label>
               </div>
 
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="isNestExternal" 
+                  name="isNestExternal" 
+                  checked={formData.isNestExternal || false} 
+                  onChange={handleChange}
+                  className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                />
+                <label htmlFor="isNestExternal" className="text-sm font-bold text-emerald-700 cursor-pointer select-none">
+                  Visiteret til NEST ekstern plads (de 5 pladser)
+                </label>
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Noter</label>
                 <textarea 

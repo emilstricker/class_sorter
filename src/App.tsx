@@ -1,12 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Student, ClassInfo, Gender, Level } from './types';
+import { Student, ClassInfo, Gender, Level, Workspace, JoinRequest } from './types';
 import { StudentCard } from './components/StudentCard';
 import { ClassBoard } from './components/ClassBoard';
 import { EditModal } from './components/EditModal';
 import { StatsModal } from './components/StatsModal';
 import { StudentTableView } from './components/StudentTableView';
 import { SmartImportModal } from './components/SmartImportModal';
-import { Upload, Users, AlertCircle, Trash2, Loader2, List, Wand2, RotateCcw, Eye, EyeOff, Download, UploadCloud, ShieldCheck, Settings, X, ArrowUpDown, Search, BarChart3, Printer, Layout } from 'lucide-react';
+import { Upload, Users, AlertCircle, Trash2, Loader2, List, Wand2, RotateCcw, Eye, EyeOff, Download, UploadCloud, ShieldCheck, Settings, X, ArrowUpDown, Search, BarChart3, Printer, Layout, LogOut, Share2, Bell, Check } from 'lucide-react';
+import { useAuth } from './AuthContext';
+import { auth, db, handleFirestoreError, OperationType } from './firebase';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDocs, query, where, updateDoc } from 'firebase/firestore';
 
 type SortField = 'name' | 'abilityLevel' | 'socialSkill' | 'behavioralIntensity' | 'supportLevel';
 
@@ -17,7 +20,7 @@ const processImage = (file: File): Promise<string> => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        // Resize to a maximum of 140x200 to keep the base64 string small for localStorage
+        // Resize to a maximum of 140x200 to keep the base64 string small for localStorage and Firestore
         const MAX_WIDTH = 140;
         const MAX_HEIGHT = 200;
         let width = img.width;
@@ -54,38 +57,11 @@ const processImage = (file: File): Promise<string> => {
 };
 
 export default function App() {
-  const [students, setStudents] = useState<Student[]>(() => {
-    const saved = localStorage.getItem('classSorterStudents');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.map(s => {
-            const newFriendships = new Set(s.friendships || []);
-            const newConflicts = new Set(s.conflicts || []);
-            
-            parsed.forEach(other => {
-              if (other.id !== s.id) {
-                if (other.friendships?.includes(s.id)) newFriendships.add(other.id);
-                if (other.conflicts?.includes(s.id)) newConflicts.add(other.id);
-              }
-            });
-            
-            newFriendships.forEach(id => newConflicts.delete(id));
-            
-            return {
-              ...s,
-              friendships: Array.from(newFriendships),
-              conflicts: Array.from(newConflicts)
-            };
-          });
-        }
-      } catch (e) {
-        console.error("Failed to parse saved students", e);
-      }
-    }
-    return [];
-  });
+  const { user, signOut } = useAuth();
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -100,16 +76,180 @@ export default function App() {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [globalSearch, setGlobalSearch] = useState('');
-  const [numClasses, setNumClasses] = useState<number>(() => {
-    const saved = localStorage.getItem('classSorterNumClasses');
-    const parsed = saved ? parseInt(saved, 10) : 3;
-    return Math.max(2, parsed);
-  });
   const [showPrintHint, setShowPrintHint] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
-  const CLASSES: ClassInfo[] = Array.from({ length: Math.max(0, numClasses - 1) }, (_, i) => ({
+  // Listen to workspaces
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'workspaces'), where('members', 'array-contains', user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const w: Workspace[] = [];
+      snapshot.forEach(doc => w.push(doc.data() as Workspace));
+      setWorkspaces(w);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'workspaces');
+    });
+    return unsubscribe;
+  }, [user]);
+
+  // Handle active workspace and first-time setup
+  useEffect(() => {
+    if (!user) return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const joinId = params.get('join');
+
+    if (workspaces.length > 0) {
+      if (joinId && workspaces.some(w => w.id === joinId)) {
+        setActiveWorkspace(workspaces.find(w => w.id === joinId)!);
+        window.history.replaceState({}, '', '/');
+      } else if (!activeWorkspace || !workspaces.some(w => w.id === activeWorkspace.id)) {
+        setActiveWorkspace(workspaces[0]);
+      }
+    }
+  }, [user, workspaces, activeWorkspace]);
+
+  useEffect(() => {
+    if (!user) return;
+    let isActive = true;
+
+    const init = setTimeout(async () => {
+      // If after 1.5 seconds we still have no workspaces, assume we need to act
+      if (!isActive || workspaces.length > 0) return;
+      
+      const params = new URLSearchParams(window.location.search);
+      const joinId = params.get('join');
+
+      if (joinId) {
+        try {
+          await setDoc(doc(db, 'workspaces', joinId, 'joinRequests', user.uid), {
+           userId: user.uid,
+           email: user.email || 'Ukendt'
+          });
+          showToast("Anmodning om adgang er sendt! Venter på godkendelse...");
+          window.history.replaceState({}, '', '/');
+        } catch (e) {
+          console.error(e);
+          showToast("Kunne ikke sende anmodning - projektet findes måske ikke.");
+          window.history.replaceState({}, '', '/');
+        }
+        return;
+      }
+
+      // Create new default workspace
+      const newId = doc(collection(db, 'workspaces')).id;
+      const newWs: Workspace = {
+         id: newId,
+         name: 'Min Skole',
+         ownerId: user.uid,
+         members: [user.uid],
+         numClasses: 3
+      };
+      try {
+        await setDoc(doc(db, 'workspaces', newId), newWs);
+        const oldQuery = await getDocs(collection(db, 'users', user.uid, 'students'));
+        if (!oldQuery.empty) {
+          const batch = writeBatch(db);
+          let count = 0;
+          oldQuery.forEach(docSnap => {
+            const data = docSnap.data() as Student;
+            data.workspaceId = newId;
+            data.members = [user.uid];
+            batch.set(doc(db, 'workspaces', newId, 'students', data.id), data);
+            count++;
+          });
+          if (count > 0) {
+            await batch.commit();
+            showToast(`Migrerede ${count} elever til dit nye arbejdsrum!`);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }, 1500);
+
+    return () => {
+      isActive = false;
+      clearTimeout(init);
+    };
+  }, [user, workspaces.length]);
+
+  useEffect(() => {
+    if (!user || !activeWorkspace) return;
+    
+    // Listen to students
+    const unsubStudents = onSnapshot(collection(db, 'workspaces', activeWorkspace.id, 'students'), (snapshot) => {
+      const loaded: Student[] = [];
+      snapshot.forEach(doc => {
+        loaded.push(doc.data() as Student);
+      });
+      setStudents(loaded);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'students');
+    });
+
+    // Listen to join requests if owner
+    let unsubReq = () => {};
+    if (activeWorkspace.ownerId === user.uid) {
+      unsubReq = onSnapshot(collection(db, 'workspaces', activeWorkspace.id, 'joinRequests'), (snapshot) => {
+        const reqs: JoinRequest[] = [];
+        snapshot.forEach(d => reqs.push(d.data() as JoinRequest));
+        setJoinRequests(reqs);
+      });
+    } else {
+      setJoinRequests([]); // Clear if switching workspace
+    }
+
+    return () => {
+      unsubStudents();
+      unsubReq();
+    };
+  }, [user, activeWorkspace]);
+
+  const updateSettingInFirestore = async (newNumClasses: number) => {
+    if (!user || !activeWorkspace) return;
+    try {
+      await updateDoc(doc(db, 'workspaces', activeWorkspace.id), { numClasses: newNumClasses });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `workspaces/${activeWorkspace.id}`);
+    }
+  };
+
+  const syncStudentToFirestore = async (student: Student) => {
+    if (!user || !activeWorkspace) return;
+    try {
+      const s = { ...student, workspaceId: activeWorkspace.id, members: activeWorkspace.members };
+      await setDoc(doc(db, 'workspaces', activeWorkspace.id, 'students', student.id), s);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `workspaces/${activeWorkspace.id}/students/${student.id}`);
+    }
+  };
+
+  const deleteStudentFromFirestore = async (studentId: string) => {
+    if (!user || !activeWorkspace) return;
+    try {
+      await deleteDoc(doc(db, 'workspaces', activeWorkspace.id, 'students', studentId));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `workspaces/${activeWorkspace.id}/students/${studentId}`);
+    }
+  };
+
+  const deleteAllStudentsFromFirestore = async (studentsList: Student[]) => {
+    if (!user || !activeWorkspace) return;
+    try {
+      const batch = writeBatch(db);
+      studentsList.forEach(s => {
+        batch.delete(doc(db, 'workspaces', activeWorkspace.id, 'students', s.id));
+      });
+      await batch.commit();
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `workspaces/${activeWorkspace.id}/students`);
+    }
+  };
+
+  const CLASSES: ClassInfo[] = Array.from({ length: Math.max(0, (activeWorkspace?.numClasses || 3) - 1) }, (_, i) => ({
     id: `class-${String.fromCharCode(97 + i)}`,
     name: `Klasse ${String.fromCharCode(65 + i)}`,
   }));
@@ -139,37 +279,26 @@ export default function App() {
     .filter(s => s.classId === null)
     .sort(sortStudents);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('classSorterStudents', JSON.stringify(students));
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-        showToast("Lokal lagring er fuld! Nogle data gemmes muligvis ikke.");
-      }
-    }
-  }, [students]);
-
-  useEffect(() => {
-    localStorage.setItem('classSorterNumClasses', numClasses.toString());
-    
-    // Unassign students from classes that no longer exist
-    const validClassIds = new Set(CLASSES.map(c => c.id));
-    setStudents(prev => {
-      let changed = false;
-      const next = prev.map(s => {
-        if (s.classId && !validClassIds.has(s.classId)) {
-          changed = true;
-          return { ...s, classId: null };
-        }
-        return s;
-      });
-      return changed ? next : prev;
-    });
-  }, [numClasses]);
-
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const batchCommitAll = async (newStudentsList: Student[]) => {
+    if (!user || !activeWorkspace) return;
+    try {
+      for (let i = 0; i < newStudentsList.length; i += 400) {
+        const chunk = newStudentsList.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(s => {
+          const mapped = { ...s, workspaceId: activeWorkspace.id, members: activeWorkspace.members };
+          batch.set(doc(db, 'workspaces', activeWorkspace.id, 'students', mapped.id), mapped);
+        });
+        await batch.commit();
+      }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `workspaces/${activeWorkspace.id}/students-batch`);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,7 +327,7 @@ export default function App() {
       });
 
       const newStudents = await Promise.all(newStudentsPromises);
-      setStudents(prev => [...prev, ...newStudents]);
+      await batchCommitAll(newStudents);
       showToast(`Behandlede ${newStudents.length} billeder.`);
     } catch (error) {
       showToast("Fejl ved behandling af nogle billeder.");
@@ -222,9 +351,9 @@ export default function App() {
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e: React.DragEvent, targetClassId: string | null) => {
+  const handleDrop = async (e: React.DragEvent, targetClassId: string | null) => {
     e.preventDefault();
-    if (isBulkMode) return;
+    if (isBulkMode || !user) return;
     
     const studentId = e.dataTransfer.getData('studentId');
     if (!studentId) return;
@@ -248,19 +377,27 @@ export default function App() {
       }
     }
 
-    setStudents(prev => prev.map(s => 
-      s.id === studentId ? { ...s, classId: targetClassId } : s
-    ));
+    const student = students.find(s => s.id === studentId);
+    if (student) {
+      await syncStudentToFirestore({ ...student, classId: targetClassId });
+    }
   };
 
-  const handleSaveStudent = (updated: Student) => {
+  const handleSaveStudent = async (updated: Student) => {
+    if (!user || !activeWorkspace) return;
+    
     // If marked as NEST-external, auto-assign to NEST class
     if (updated.isNestExternal) {
       updated.classId = 'class-nest';
     }
 
-    setStudents(prev => prev.map(s => {
-      if (s.id === updated.id) return updated;
+    const batch = writeBatch(db);
+    const mappedUpdated = { ...updated, workspaceId: activeWorkspace.id, members: activeWorkspace.members };
+    batch.set(doc(db, 'workspaces', activeWorkspace.id, 'students', updated.id), mappedUpdated);
+
+    // Update relationships for other students mutually
+    students.forEach(s => {
+      if (s.id === updated.id) return;
       
       const isFriend = updated.friendships?.includes(s.id);
       const isConflict = updated.conflicts?.includes(s.id);
@@ -283,16 +420,28 @@ export default function App() {
         newFriendships.length !== (s.friendships || []).length || 
         newConflicts.length !== (s.conflicts || []).length
       ) {
-        return { ...s, friendships: newFriendships, conflicts: newConflicts };
+        const mappedS = { ...s, friendships: newFriendships, conflicts: newConflicts, workspaceId: activeWorkspace.id, members: activeWorkspace.members };
+        batch.set(doc(db, 'workspaces', activeWorkspace.id, 'students', s.id), mappedS);
       }
-      
-      return s;
-    }));
+    });
+
+    try {
+      await batch.commit();
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `workspaces/${activeWorkspace.id}/students-batch`);
+    }
+
     setEditingStudent(null);
   };
 
-  const handleDeleteStudent = (id: string) => {
-    setStudents(prev => prev.filter(s => s.id !== id).map(s => {
+  const handleDeleteStudent = async (id: string) => {
+    if (!user || !activeWorkspace) return;
+    await deleteStudentFromFirestore(id);
+    
+    const batch = writeBatch(db);
+    let changed = false;
+    students.forEach(s => {
+      if (s.id === id) return;
       const newFriendships = s.friendships?.filter(fId => fId !== id) || [];
       const newConflicts = s.conflicts?.filter(cId => cId !== id) || [];
       
@@ -300,17 +449,27 @@ export default function App() {
         newFriendships.length !== (s.friendships || []).length || 
         newConflicts.length !== (s.conflicts || []).length
       ) {
-        return { ...s, friendships: newFriendships, conflicts: newConflicts };
+        changed = true;
+        const mappedS = { ...s, friendships: newFriendships, conflicts: newConflicts, workspaceId: activeWorkspace.id, members: activeWorkspace.members };
+        batch.set(doc(db, 'workspaces', activeWorkspace.id, 'students', s.id), mappedS);
       }
-      return s;
-    }));
+    });
+    
+    if (changed) {
+      try {
+        await batch.commit();
+      } catch (e) {
+         handleFirestoreError(e, OperationType.WRITE, `workspaces/${activeWorkspace.id}/students-batch`);
+      }
+    }
     setEditingStudent(null);
   };
 
-  const handleToggleLock = (studentId: string) => {
-    setStudents(prev => prev.map(s => 
-      s.id === studentId ? { ...s, isLocked: !s.isLocked } : s
-    ));
+  const handleToggleLock = async (studentId: string) => {
+    const student = students.find(s => s.id === studentId);
+    if (student) {
+      await syncStudentToFirestore({ ...student, isLocked: !student.isLocked });
+    }
   };
 
   const handleUnassignAll = () => {
@@ -363,7 +522,7 @@ export default function App() {
               conflicts: Array.from(newConflicts)
             };
           });
-          setStudents(fixedStudents);
+          batchCommitAll(fixedStudents);
           showToast("Data blev importeret korrekt.");
         } else {
           showToast("Ugyldigt format på backup-fil.");
@@ -610,7 +769,7 @@ export default function App() {
       }
     });
 
-    setStudents(newStudents);
+    batchCommitAll(newStudents);
     if (unassignedCount > 0) {
       showToast(`Auto-fordeling færdig, men ${unassignedCount} elever kunne ikke placeres pga. klassekvotienter.`);
     } else {
@@ -619,35 +778,32 @@ export default function App() {
   };
 
   const handleSmartImport = (parsedData: any[]) => {
-    setStudents(prevStudents => {
-      const newStudents = [...prevStudents];
+    let newStudents = [...students];
+    parsedData.forEach(data => {
+      const studentIndex = newStudents.findIndex(s => s.id === data.studentId);
+      if (studentIndex === -1) return; // Skip if not found
       
-      parsedData.forEach(data => {
-        const studentIndex = newStudents.findIndex(s => s.id === data.studentId);
-        if (studentIndex === -1) return; // Skip if not found
-        
-        const student = { ...newStudents[studentIndex] };
-        
-        if (data.notes) student.notes = (student.notes ? student.notes + '\n' : '') + data.notes;
-        if (data.preferNestClass) student.preferNestClass = true;
-        if (data.isNestExternal) student.isNestExternal = true;
-        if (data.isDyslexic) student.isDyslexic = true;
-        if (data.isExtraAttention) student.isExtraAttention = true;
-        if (data.extraAttentionNotes) student.extraAttentionNotes = data.extraAttentionNotes;
-        
-        if (data.wishesIds && Array.isArray(data.wishesIds)) {
-          student.wishes = [...new Set([...(student.wishes || []), ...data.wishesIds])];
-        }
-        
-        if (data.conflictsIds && Array.isArray(data.conflictsIds)) {
-          student.conflicts = [...new Set([...(student.conflicts || []), ...data.conflictsIds])];
-        }
-        
-        newStudents[studentIndex] = student;
-      });
-
-      return newStudents;
+      const student = { ...newStudents[studentIndex] };
+      
+      if (data.notes) student.notes = (student.notes ? student.notes + '\n' : '') + data.notes;
+      if (data.preferNestClass) student.preferNestClass = true;
+      if (data.isNestExternal) student.isNestExternal = true;
+      if (data.isDyslexic) student.isDyslexic = true;
+      if (data.isExtraAttention) student.isExtraAttention = true;
+      if (data.extraAttentionNotes) student.extraAttentionNotes = data.extraAttentionNotes;
+      
+      if (data.wishesIds && Array.isArray(data.wishesIds)) {
+        student.wishes = [...new Set([...(student.wishes || []), ...data.wishesIds])];
+      }
+      
+      if (data.conflictsIds && Array.isArray(data.conflictsIds)) {
+        student.conflicts = [...new Set([...(student.conflicts || []), ...data.conflictsIds])];
+      }
+      
+      newStudents[studentIndex] = student;
     });
+
+    batchCommitAll(newStudents);
     showToast(`Importerede relationer for ${parsedData.length} elever.`);
   };
 
@@ -655,6 +811,39 @@ export default function App() {
     window.print();
     setShowPrintHint(true);
     setTimeout(() => setShowPrintHint(false), 5000);
+  };
+
+  const handleShare = () => {
+    if (!activeWorkspace) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('join', activeWorkspace.id);
+    navigator.clipboard.writeText(url.toString());
+    showToast("Link kopieret! Del det med dine kolleger for at samarbejde.");
+  };
+
+  const handleAcceptRequest = async (req: JoinRequest) => {
+    if (!user || !activeWorkspace) return;
+    try {
+      const newMembers = [...activeWorkspace.members, req.userId];
+      
+      const batch = writeBatch(db);
+      // update workspace
+      batch.update(doc(db, 'workspaces', activeWorkspace.id), { members: newMembers });
+      // delete request
+      batch.delete(doc(db, 'workspaces', activeWorkspace.id, 'joinRequests', req.userId));
+      
+      // update all students in workspace!
+      const studentsQuery = await getDocs(collection(db, 'workspaces', activeWorkspace.id, 'students'));
+      studentsQuery.forEach(docSnap => {
+        batch.update(docSnap.ref, { members: newMembers });
+      });
+      
+      await batch.commit();
+      showToast(`${req.email} har nu adgang til projektet!`);
+    } catch (e) {
+      console.error(e);
+      showToast("Der opstod en fejl.");
+    }
   };
 
   return (
@@ -670,8 +859,16 @@ export default function App() {
             <Users className="text-white" size={24} />
           </div>
           <div>
-            <h1 className="text-xl font-extrabold tracking-tight text-gray-900">Klassesortering</h1>
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Intelligent Elevfordeling</p>
+            <h1 className="text-xl font-extrabold tracking-tight text-gray-900">
+              {activeWorkspace?.name || "Klassesortering"}
+            </h1>
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
+               Intelligent Elevfordeling
+               <span className="flex items-center gap-1 ml-1 text-emerald-600">
+                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                 Live
+               </span>
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -695,6 +892,14 @@ export default function App() {
           </div>
 
           <div className={`h-8 w-px bg-gray-200 mx-1 hidden sm:block ${hideCardDetails ? 'hidden' : ''}`} />
+
+          <button 
+            onClick={handleShare}
+            className={`flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 ${hideCardDetails ? 'hidden' : ''}`}
+          >
+            <Share2 size={18} />
+            <span className="hidden sm:inline">Del projekt</span>
+          </button>
 
           <input 
             type="file" 
@@ -730,6 +935,14 @@ export default function App() {
             <BarChart3 size={20} className="text-gray-400 group-hover:text-indigo-600 transition-colors" />
           </button>
 
+          <button 
+            onClick={signOut}
+            className={`flex items-center justify-center bg-white border border-gray-200 hover:border-rose-200 hover:bg-rose-50 text-gray-700 w-11 h-11 rounded-xl transition-all shadow-sm active:scale-95 group ${hideCardDetails ? 'hidden' : ''}`}
+            title="Log ud"
+          >
+            <LogOut size={20} className="text-gray-400 group-hover:text-rose-600 transition-colors" />
+          </button>
+
           <div className={`relative ${hideCardDetails ? 'hidden' : ''}`}>
             <button 
               onClick={handlePrint}
@@ -748,11 +961,36 @@ export default function App() {
 
           <button 
             onClick={() => setShowSettingsModal(true)}
-            className="flex items-center justify-center bg-white border border-gray-200 hover:border-indigo-200 hover:bg-indigo-50 text-gray-700 w-11 h-11 rounded-xl transition-all shadow-sm active:scale-95 group"
+            className="flex items-center justify-center bg-white border border-gray-200 hover:border-indigo-200 hover:bg-indigo-50 text-gray-700 w-11 h-11 rounded-xl transition-all shadow-sm active:scale-95 relative group"
             title="Indstillinger"
           >
             <Settings size={20} className="text-gray-400 group-hover:text-indigo-600 transition-colors" />
+            {joinRequests.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full animate-bounce" />
+            )}
           </button>
+
+          {joinRequests.length > 0 && activeWorkspace?.ownerId === user.uid && (
+            <div className="absolute top-20 right-6 bg-white rounded-xl shadow-xl shadow-rose-100/50 border border-amber-200/50 p-4 z-50 w-80 animate-in fade-in slide-in-from-top-4">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-3">
+                <Bell size={18} className="text-amber-500" />
+                Anmodninger om adgang
+              </h3>
+              <div className="space-y-3">
+                {joinRequests.map(req => (
+                  <div key={req.userId} className="flex flex-col gap-2 p-3 bg-amber-50/50 rounded-lg border border-amber-100 shrink-0">
+                    <span className="text-sm font-medium text-gray-700">{req.email}</span>
+                    <button 
+                      onClick={() => handleAcceptRequest(req)}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-md text-sm font-bold transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Check size={16} /> Godkend
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Hidden import input for the settings modal */}
           <input 
@@ -884,7 +1122,7 @@ export default function App() {
               </button>
               <button 
                 onClick={() => {
-                  setStudents(students.map(s => s.isLocked ? s : { ...s, classId: null }));
+                  batchCommitAll(students.map(s => s.isLocked ? s : { ...s, classId: null }));
                   setShowUnassignConfirm(false);
                   showToast("Alle ikke-låste elever er blevet fjernet fra deres klasser.");
                 }}
@@ -912,8 +1150,43 @@ export default function App() {
             
             <div className="p-4 overflow-y-auto flex flex-col gap-6">
               
-              {/* Configuration */}
+              {/* Workspaces */}
               <section>
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Arbejdsrum</h3>
+                <div className="space-y-2 mb-6">
+                  {workspaces.map(w => (
+                    <button
+                      key={w.id}
+                      onClick={() => { setActiveWorkspace(w); setShowSettingsModal(false); }}
+                      className={`w-full text-left p-3 rounded-lg border flex justify-between items-center transition-colors ${activeWorkspace?.id === w.id ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-gray-50 hover:bg-gray-100 border-gray-100'}`}
+                    >
+                      <div>
+                        <div className="font-medium text-sm">{w.name}</div>
+                        <div className="text-xs opacity-70 mt-0.5">{w.ownerId === user?.uid ? 'Ejer' : 'Delt med mig'} • {w.members.length} {w.members.length === 1 ? 'medlem' : 'medlemmer'}</div>
+                      </div>
+                      {activeWorkspace?.id === w.id && <Check size={16} />}
+                    </button>
+                  ))}
+                  <button
+                    onClick={async () => {
+                       const name = prompt("Hvad skal det nye arbejdsrum hedde?");
+                       if (!name || !user) return;
+                       const newId = doc(collection(db, 'workspaces')).id;
+                       await setDoc(doc(db, 'workspaces', newId), {
+                         id: newId,
+                         name,
+                         ownerId: user.uid,
+                         members: [user.uid],
+                         numClasses: 3
+                       });
+                       showToast("Nyt arbejdsrum oprettet.");
+                    }}
+                    className="w-full text-sm font-medium text-indigo-600 bg-indigo-50/50 hover:bg-indigo-100 py-2.5 rounded-lg transition-colors border border-indigo-200 border-dashed"
+                  >
+                    + Nyt arbejdsrum
+                  </button>
+                </div>
+
                 <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Konfiguration</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100">
@@ -922,8 +1195,8 @@ export default function App() {
                       <span className="text-xs text-gray-500">Inkluderer NEST-klasse</span>
                     </div>
                     <select 
-                      value={numClasses}
-                      onChange={(e) => setNumClasses(Number(e.target.value))}
+                      value={activeWorkspace?.numClasses || 3}
+                      onChange={(e) => updateSettingInFirestore(Number(e.target.value))}
                       className="bg-white border border-gray-300 text-gray-700 text-sm rounded-md px-3 py-1.5 outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       {[2, 3, 4, 5, 6].map(n => (
@@ -1051,8 +1324,7 @@ export default function App() {
               </button>
               <button 
                 onClick={() => {
-                  setStudents([]);
-                  localStorage.removeItem('classSorterStudents');
+                  deleteAllStudentsFromFirestore(students);
                   setShowClearConfirm(false);
                   showToast("Alle data er slettet.");
                 }}

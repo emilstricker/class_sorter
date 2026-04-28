@@ -1,6 +1,19 @@
 export type Gender = 'Boy' | 'Girl' | 'Other' | 'Unknown';
 export type Level = 1 | 2 | 3 | 4 | 5;
 
+export interface Workspace {
+  id: string;
+  name: string;
+  ownerId: string;
+  members: string[];
+  numClasses: number;
+}
+
+export interface JoinRequest {
+  userId: string;
+  email: string;
+}
+
 export interface Student {
   id: string;
   name: string;
@@ -25,6 +38,8 @@ export interface Student {
   avoidNestClass?: boolean;
   preferNestClass?: boolean;
   isNestExternal?: boolean;
+  workspaceId?: string;
+  members?: string[];
 }
 
 export interface ClassInfo {
