@@ -60,6 +60,7 @@ export default function App() {
   const { user, signOut } = useAuth();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspacesLoaded, setWorkspacesLoaded] = useState(false);
+  const prevWorkspaces = useRef<Workspace[]>([]);
   const [joinDialogDetails, setJoinDialogDetails] = useState<{ id: string, requested: boolean, error?: string } | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
@@ -89,6 +90,22 @@ export default function App() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const w: Workspace[] = [];
       snapshot.forEach(doc => w.push(doc.data() as Workspace));
+      
+      // Auto-switch to newly joined workspaces (if we already loaded at least once)
+      if (prevWorkspaces.current.length > 0 && w.length > prevWorkspaces.current.length) {
+         const newIds = w.map(x => x.id);
+         const oldIds = prevWorkspaces.current.map(x => x.id);
+         const addedId = newIds.find(id => !oldIds.includes(id));
+         if (addedId) {
+            const addedWorkspace = w.find(x => x.id === addedId);
+            if (addedWorkspace) {
+               setActiveWorkspace(addedWorkspace);
+               showToast(`Skiftede til det nye arbejdsrum: ${addedWorkspace.name}`);
+            }
+         }
+      }
+      prevWorkspaces.current = w;
+      
       setWorkspaces(w);
       setWorkspacesLoaded(true);
     }, (error) => {
