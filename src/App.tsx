@@ -893,7 +893,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
+    <div className={`${isBulkMode ? 'h-screen overflow-hidden' : 'min-h-screen'} flex flex-col bg-[#F8FAFC] text-gray-900 selection:bg-indigo-100 selection:text-indigo-900`}>
       <div className="hidden print:block mb-8 border-b-2 border-gray-900 pb-4">
         <h1 className="text-3xl font-black uppercase tracking-tighter">Klasselister</h1>
         <p className="text-sm font-bold text-gray-500 mt-1">Genereret den {new Date().toLocaleDateString('da-DK')}</p>
