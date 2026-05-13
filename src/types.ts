@@ -7,6 +7,12 @@ export interface Workspace {
   ownerId: string;
   members: string[];
   numClasses: number;
+  classSettings?: {
+    [classId: string]: {
+      name?: string;
+      teacherName?: string;
+    }
+  };
 }
 
 export interface JoinRequest {
@@ -45,6 +51,7 @@ export interface Student {
 export interface ClassInfo {
   id: string;
   name: string;
+  teacherName?: string;
   maxInternal?: number;
   externalSlots?: number;
 }

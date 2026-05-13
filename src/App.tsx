@@ -8,6 +8,7 @@ import { StudentTableView } from './components/StudentTableView';
 import { SmartImportModal } from './components/SmartImportModal';
 import { Upload, Users, AlertCircle, Trash2, Loader2, List, Wand2, RotateCcw, Eye, EyeOff, Download, UploadCloud, ShieldCheck, Settings, X, ArrowUpDown, Search, BarChart3, Printer, Layout, LogOut, Share2, Bell, Check, Eraser } from 'lucide-react';
 import CleanupNamesModal from './components/CleanupNamesModal';
+import { EditClassModal } from './components/EditClassModal';
 import { useAuth } from './AuthContext';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDocs, query, where, updateDoc } from 'firebase/firestore';
@@ -69,6 +70,7 @@ export default function App() {
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editingClass, setEditingClass] = useState<ClassInfo | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -295,11 +297,38 @@ export default function App() {
     }
   };
 
-  const CLASSES: ClassInfo[] = Array.from({ length: Math.max(0, (activeWorkspace?.numClasses || 3) - 1) }, (_, i) => ({
-    id: `class-${String.fromCharCode(97 + i)}`,
-    name: `Klasse ${String.fromCharCode(65 + i)}`,
-  }));
-  CLASSES.push({ id: 'class-nest', name: 'NEST-klasse', maxInternal: 16, externalSlots: 5 });
+  const CLASSES: ClassInfo[] = Array.from({ length: Math.max(0, (activeWorkspace?.numClasses || 3) - 1) }, (_, i) => {
+    const classId = `class-${String.fromCharCode(97 + i)}`;
+    const settings = activeWorkspace?.classSettings?.[classId];
+    return {
+      id: classId,
+      name: settings?.name || `Klasse ${String.fromCharCode(65 + i)}`,
+      teacherName: settings?.teacherName
+    };
+  });
+
+  const nestSettings = activeWorkspace?.classSettings?.['class-nest'];
+  CLASSES.push({ 
+    id: 'class-nest', 
+    name: nestSettings?.name || 'NEST-klasse', 
+    teacherName: nestSettings?.teacherName,
+    maxInternal: 16, 
+    externalSlots: 5 
+  });
+
+  const handleUpdateClassSettings = async (classId: string, name: string, teacherName: string) => {
+    if (!user || !activeWorkspace) return;
+    try {
+      const updatedSettings = {
+        ...(activeWorkspace.classSettings || {}),
+        [classId]: { name, teacherName }
+      };
+      await updateDoc(doc(db, 'workspaces', activeWorkspace.id), { classSettings: updatedSettings });
+      showToast(`Klasseoplysninger opdateret`);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `workspaces/${activeWorkspace.id}`);
+    }
+  };
 
   const sortStudents = (a: Student, b: Student) => {
     let comparison = 0;
@@ -1134,6 +1163,10 @@ export default function App() {
               isPrivacyMode={isPrivacyMode}
               hideDetails={hideCardDetails}
               onToggleLock={handleToggleLock}
+              onEditClass={(classId) => {
+                const c = CLASSES.find(cls => cls.id === classId);
+                if (c) setEditingClass(c);
+              }}
             />
           ))}
         </section>
@@ -1155,6 +1188,13 @@ export default function App() {
           onSave={handleSaveStudent} 
           onClose={() => setEditingStudent(null)}
           onDelete={handleDeleteStudent}
+        />
+      )}
+      {editingClass && (
+        <EditClassModal 
+          classInfo={editingClass}
+          onClose={() => setEditingClass(null)}
+          onSave={handleUpdateClassSettings}
         />
       )}
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ClassInfo, Student } from '../types';
 import { StudentCard } from './StudentCard';
-import { Users, Brain, HeartHandshake, Zap, ShieldPlus } from 'lucide-react';
+import { Users, Brain, HeartHandshake, Zap, ShieldPlus, Edit2 } from 'lucide-react';
 
 interface ClassBoardProps {
   classInfo: ClassInfo;
@@ -14,6 +14,7 @@ interface ClassBoardProps {
   isPrivacyMode?: boolean;
   hideDetails?: boolean;
   onToggleLock: (studentId: string) => void;
+  onEditClass?: (classId: string) => void;
 }
 
 export function ClassBoard({ 
@@ -26,11 +27,16 @@ export function ClassBoard({
   isBulkMode,
   isPrivacyMode,
   hideDetails,
-  onToggleLock
+  onToggleLock,
+  onEditClass
 }: ClassBoardProps) {
   
   const boysCount = students.filter(s => s.gender === 'Boy').length;
   const girlsCount = students.filter(s => s.gender === 'Girl').length;
+
+  const handleEditClick = () => {
+    if (onEditClass) onEditClass(classInfo.id); 
+  };
   
   const avgAbility = students.length 
     ? (students.reduce((acc, s) => acc + s.abilityLevel, 0) / students.length).toFixed(1) 
@@ -51,6 +57,8 @@ export function ClassBoard({
   const dsaCount = students.filter(s => s.isDSA).length;
   const spsCount = students.filter(s => s.isSPS).length;
   const medCount = students.filter(s => s.isMedical).length;
+  const dysCount = students.filter(s => s.isDyslexic).length;
+  const extraCount = students.filter(s => s.isExtraAttention).length;
   const nestExternalCount = students.filter(s => s.isNestExternal).length;
 
   const isFull = classInfo.maxInternal && (students.length - nestExternalCount) >= classInfo.maxInternal;
@@ -64,8 +72,24 @@ export function ClassBoard({
       {/* Header Stats */}
       <div className={`p-4 border-b ${isFull ? 'bg-orange-50/50' : 'bg-gray-50/50'} backdrop-blur-sm print:bg-white`}>
         <div className="flex justify-between items-start mb-3">
-          <div>
-            <h3 className="font-extrabold text-gray-900 tracking-tight">{classInfo.name}</h3>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 group/title">
+              <h3 className="font-extrabold text-gray-900 tracking-tight">{classInfo.name}</h3>
+              {onEditClass && (
+                <button 
+                  onClick={handleEditClick}
+                  className="p-1 text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-all opacity-0 group-hover/title:opacity-100 no-print"
+                  title="Rediger klasseoplysninger"
+                >
+                  <Edit2 size={12} />
+                </button>
+              )}
+            </div>
+            {classInfo.teacherName && (
+              <div className="text-[11px] text-indigo-600 font-bold tracking-tight">
+                Lærer: {classInfo.teacherName}
+              </div>
+            )}
             {classInfo.externalSlots && (
               <div className={`text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5 no-print ${hideDetails ? 'hidden' : ''}`}>
                 + {classInfo.externalSlots} eksterne pladser ({nestExternalCount} brugt)
@@ -113,7 +137,7 @@ export function ClassBoard({
             </div>
           </div>
 
-          {(dsaCount > 0 || spsCount > 0 || medCount > 0) && (
+          {(dsaCount > 0 || spsCount > 0 || medCount > 0 || dysCount > 0 || extraCount > 0) && (
             <div className="flex flex-wrap gap-1.5 mt-1">
               {dsaCount > 0 && (
                 <span className="bg-indigo-500 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-sm" title="DSA">
@@ -128,6 +152,16 @@ export function ClassBoard({
               {medCount > 0 && (
                 <span className="bg-rose-500 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-sm" title="MED">
                   {medCount} MED
+                </span>
+              )}
+              {dysCount > 0 && (
+                <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-sm" title="Ordblind">
+                  {dysCount} ORD
+                </span>
+              )}
+              {extraCount > 0 && (
+                <span className="bg-gray-700 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-sm" title="Skærpet opmærksomhed">
+                  {extraCount} SKÆ
                 </span>
               )}
             </div>
